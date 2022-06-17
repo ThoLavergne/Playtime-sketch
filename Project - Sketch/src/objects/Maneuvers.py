@@ -3,19 +3,21 @@ from enum import Enum
 from function.tools import KMH2KNOTS, KNOTS2KMH, FT2M, M2FT
 import math
 
+
 MINDISTWHEEL = 2.5  # KM : used for the straight line above the objective
 
 STRAIGHT_LINE_SF = 10  # KM : used for the straight line to go next to the
 ARC_SF = 4.7  # KM : used for the arc between the two straight lines
 # objective and another one above the objective
-MINALTITUDE = 0.2  # KM : will be set with the type of terrain
-MAXALTITUDE = 18  # KM : refer to M2000 max
+MINALTITUDE = 300  # feet : will be set with the type of terrain
+MAXALTITUDE = 40000  # feet : refer to M2000 max
 
-CONSTK1 = 0.00051
 
 MINSPEED = 100  # KM/H : used for reference for ULM
 MAXSPEED = 200  # KM/H : used for reference for ULM
 
+
+CONSTK1 = 0.000051
 
 # Every type of maneuver available
 
@@ -53,6 +55,7 @@ class Mission_Maneuver(Enum):
             return {Maneuver_Mission.ShowOfForce: 1, Maneuver_Mission.Wheel: 1}
 
 
+
 # Maneuver associated with a speed, altitude, efficiency
 # and calculate fuel consumption
 
@@ -60,32 +63,26 @@ class Maneuver:
 
     def __init__(self, name: Maneuver_Mission, fullname: str,
                  meanspeed: int, altitude: float,
-                 distance: float,
-                 #  efficiency: int = 50
-                 ):
-        #  maxspeed: int, minspeed: int,
-        # if efficiency <= 100 and efficiency >= 0:
-        #     self.efficiency = efficiency
-        # else:
-        #     self.efficiency = 50
-        #     raise Exception("Efficiency is not valid, set to 0")
+                 distance: float,):
         self.name = name
         self.fullname = fullname
 
         self.meanspeed = meanspeed  # In knots
         self.meanspeed_kmh = round((self.meanspeed * KNOTS2KMH))
-        self.maxspeed = round(MAXSPEED * KMH2KNOTS)
-        # maxspeed
-        self.maxspeed_kmh = MAXSPEED
-        # maxspeed * KNOTS2KMH
-        self.minspeed = round(MINSPEED * KMH2KNOTS)
-        # minspeed
-        self.minspeed_kmh = MINSPEED
-        # minspeed * KNOTS2KMH
 
-        self.altitude = altitude  # In KM
+        self.maxspeed = round(MAXSPEED * KMH2KNOTS)
+        self.maxspeed_kmh = MAXSPEED
+
+        self.minspeed = round(MINSPEED * KMH2KNOTS)
+        self.minspeed_kmh = MINSPEED
+        
         self.minaltitude = MINALTITUDE
         self.maxaltitude = MAXALTITUDE
+        if altitude >= self.minaltitude and altitude <= self.maxaltitude:
+            self.altitude = altitude  # In feet
+        else:
+            raise Exception("Altitude is not between min and max : ", altitude)
+
         self.distance = distance  # In KM
         # self.available_mission = name.value
         self.plan = self.travel_plan()
@@ -132,17 +129,9 @@ class Maneuver:
 class Wheel(Maneuver):
     # maxspeed: int, minspeed: int,
     def __init__(self, fullname: str, meanspeed: int, altitude: float,
-                 distance: float,
-                 #  efficiency: int = 50
-                 ):
+                 distance: float,):
         super().__init__(Maneuver_Mission.Wheel, fullname, meanspeed,
-                         altitude, distance,
-                         #  efficiency
-                         )
-        #  maxspeed, minspeed,
-        # if self.distance <= 2 * MINDISTWHEEL:
-        #     raise Exception("Not enough distance, at least ",
-        #                     MINDISTWHEEL * 2, " km for a nicely done wheel")
+                         altitude, distance,)
 
     def travel_plan(self) -> list:
         # Add few steps in the wheel : first is a circle at meanspeed
@@ -161,14 +150,14 @@ class Wheel(Maneuver):
         second = dict()
         second['Speed'] = self.minspeed_kmh
         second['Distance'] = 0.5
-        second['Altitude'] = (self.altitude / 2)
+        second['Altitude'] = (self.altitude / 2) if (self.altitude / 2) > self.minaltitude else self.minaltitude
         second['Time'] = 0.5 / (self.minspeed_kmh / 3600)
         t_plan.append(second)
 
         third = dict()
         third['Speed'] = self.maxspeed_kmh
         third['Distance'] = self.distance - MINDISTWHEEL - 0.5
-        third['Altitude'] = (self.altitude / 2)
+        third['Altitude'] = (self.altitude / 2) if (self.altitude / 2) > self.minaltitude else self.minaltitude
         third['Time'] = third['Distance'] / (third['Speed'] / 3600)
         t_plan.append(third)
 
@@ -178,13 +167,11 @@ class Wheel(Maneuver):
 class ShowOfForce(Maneuver):
     # maxspeed: int, minspeed: int,
     def __init__(self, fullname: str):
-        #  maxspeed, minspeed,
-        # Normally, there are constant values for everything in the show of
+         # Normally, there are constant values for everything in the show of
         # force. We can leave parameters but throw fixed value in super.
 
         super().__init__(Maneuver_Mission.ShowOfForce, fullname, 81,
-                         108, 50, (1500 * FT2M) / 1000, (1000 * FT2M) / 1000,
-                         (2000 * FT2M) / 1000, 24.7)
+                         2000, 24.7)
 
     def travel_plan(self) -> list:
         # Add few steps in the show of force : first is a line at meanspeed
@@ -197,30 +184,35 @@ class ShowOfForce(Maneuver):
         first = dict()
         first['Speed'] = self.meanspeed_kmh
         first['Distance'] = STRAIGHT_LINE_SF
-        first['Altitude'] = self.altitude * 3
+        first['Altitude'] = self.altitude
         first['Time'] = STRAIGHT_LINE_SF / (self.meanspeed_kmh / 3600)
         t_plan.append(first)
 
         second = dict()
         second['Speed'] = self.minspeed_kmh
         second['Distance'] = 4.7
-        second['Altitude'] = self.altitude * (3/2)
+        second['Altitude'] = (self.altitude * (3/2)) if (self.altitude * (3/2)) < self.maxaltitude else self.maxaltitude
         second['Time'] = 2 / (self.minspeed_kmh / 3600)
         t_plan.append(second)
 
         third = dict()
         third['Speed'] = self.maxspeed_kmh
         third['Distance'] = STRAIGHT_LINE_SF
-        third['Altitude'] = self.altitude
+        third['Altitude'] = (self.altitude / 2) if (self.altitude / 2) > self.minaltitude else self.minaltitude
         third['Time'] = third['Distance'] / (third['Speed'] / 3600)
         t_plan.append(third)
 
         return t_plan
 
 
+# Calculate fuel consumption 
+
 def fuel_consumption_rate(speed: float, altitude: float,
                           plane: Plane,) -> float:
-    # Speed is in km/h, altitude in km, plane is the object Plane
+    # Speed is in km/h, altitude in feet, plane is the object Plane
     # Kg/s according to a plane's mean consumption rate, speed and altitude
-    return (plane.get_consumption_rate((speed**3/2)) *
-            math.exp(-CONSTK1 * altitude))
+    alt = altitude #  round(altitude * 1000 * FT2M) #  Change in km
+    spd = speed * 0.2778
+    
+    return (plane.get_consumption_rate(spd ** 1.25) *
+            math.exp(-CONSTK1 * alt)) #/ 3600

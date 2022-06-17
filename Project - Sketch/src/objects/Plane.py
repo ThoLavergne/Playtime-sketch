@@ -7,7 +7,7 @@ from function.tools import KNOTS2KMH, KMH2KNOTS
 
 class Plane:
     def __init__(self, name: str = 'ULM',
-                 fuel_consumption_rate: float = 0.11,
+                 fuel_consumption_rate: float = 0.0027,
                  fuel_max: int = 130, V_OPT: int = 81, V_max: int = 108):
 
         self.name = name
@@ -23,7 +23,7 @@ class Plane:
             self.fuel_max / self.fuel_consumption_rate)
         print("Cet avion peut voler pendant ", self.max_flight_time,
               " s, soit ", round(self.max_flight_time / 60),
-              " min à une vitesse moyenne de ",
+              " min, soit", round((self.max_flight_time / 3600) * self.V_Opt_kmh)," km à une vitesse moyenne de ",
               self.V_Opt_kmh,
               " km/h et sa vitesse max sera de ",
               self.V_max_kmh,
@@ -35,5 +35,8 @@ class Plane:
     def __str__(self):
         return self.name
 
+    #Get consumption rate in kg/s
+
     def get_consumption_rate(self, speed: float) -> float:
-        return self.fuel_consumption_rate * speed / self.V_Opt_kmh
+        # Speed in m/s
+        return self.fuel_consumption_rate * speed / (self.V_OPT * 0.2778)
