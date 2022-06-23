@@ -4,12 +4,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-
 KNOTS2KMH = 1.852  # knots to km/h
 KMH2KNOTS = 0.539957  # km/h to knots
 FT2M = 0.3048  # Feet to meters
 M2FT = 3.281  # Meters to feet
 
+MINALTITUDE = 300  # feet : will be set with the type of terrain
+MAXALTITUDE = 40000  # feet : refer to M2000 max
 
 # Get a list for all combinations in dict
 
@@ -36,3 +37,10 @@ def showMatrix(matrix: list):
     sns.heatmap(data=matrice_corr, cmap='RdBu', annot=True)
 
     plt.show()
+
+
+def get_curve_value_alt(altitude: int) -> float:
+    alt = int(altitude - 300)
+    f = np.linspace(0.95, 1.05, MAXALTITUDE - MINALTITUDE)
+
+    return f[alt]
