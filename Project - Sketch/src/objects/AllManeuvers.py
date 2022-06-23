@@ -1,5 +1,8 @@
 from math import pi
+from tracemalloc import start
 from objects.Maneuver import *
+import scipy.integrate as integrate
+import scipy.special as special
 
 
 class ZigZag(Maneuver):
@@ -37,9 +40,12 @@ class ZigZag(Maneuver):
 class Spiral(Maneuver):
     def __init__(self, fullname: str, speed: float,
                  altitude: float, gap: float, zone):
+        if zone[0] != zone[1]:
+            raise Exception("The zone is not a square")
+
         self.length = zone[0]
-        self.width = zone[1]
-        distance = self.calculate_distance(self.length, self.width, gap)
+        # Let's not do a spiral in a rectangle
+        distance = self.calculate_distance(self.length, gap)
         super().__init__(Maneuver_Mission.Spiral, fullname, speed,
                          altitude, distance)
 
@@ -47,10 +53,19 @@ class Spiral(Maneuver):
         t_plan = []
         return t_plan
 
-    def calculate_distance(self, length: float, width: float, gap: float):
-        distance = 0
-
-        return distance
+    def calculate_distance(self, length: float, gap: float):
+        # Source : https://planetcalc.com/9063 (https://fr.planetcalc.com/9063)
+        # https://www.intmath.com/blog/mathematics/length-of-an-archimedean-spiral-6595
+        r = length - gap
+        nb_rings = (r / (gap * 2))
+        start_theta = 0
+        end_theta = nb_rings * 2 * pi
+        b = gap / (2 * pi)
+        distance = integrate.quad(lambda theta:
+                                  np.sqrt((b * theta) ** 2 + b ** 2),
+                                  start_theta, end_theta)
+        print(distance)
+        return distance[0]
 
 
 class ShowOfForce(Maneuver):
