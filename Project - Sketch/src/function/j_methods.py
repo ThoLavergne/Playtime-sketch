@@ -2,15 +2,12 @@ import numpy as np
 from objects.AllManeuvers import *
 from objects.Plane import ULM
 
-c0: float = 0
-c1: float = 0
-
 
 def compute_maneuver(speed: float, altitude: float,
-                     distance: float, iter: int = 2):
+                     distance: float, iter: int = 1):
     wheels = []
     for _ in range(iter):
-        wheels.append(Wheel('Wheel', speed, altitude, distance))
+        wheels.append(Wheel(speed, altitude, distance))
     return (sum(w.total_fuel_consumption(ULM) for w in wheels),
             sum(w.travelled_time() for w in wheels))
 
@@ -18,21 +15,29 @@ def compute_maneuver(speed: float, altitude: float,
 
 
 def loss_fuel_min(fuel_found: int, fuel_wanted: int = 0) -> float:
-    return np.sqrt((fuel_found - fuel_wanted) ** 2)
+    value = np.sqrt((fuel_found - fuel_wanted) ** 2)
+    # print(value)
+    return value
 
 
 def loss_time_min(time_found: int, time_wanted: int = 0) -> float:
-    return np.sqrt((time_found - time_wanted) ** 2)
+    value = np.sqrt((time_found - time_wanted) ** 2)
+    # print(value)
+    return value
 
 
 # To maximize
 
 def loss_fuel_max(fuel_found: int, fuel_wanted: int = 0) -> float:
-    return 1 / np.sqrt((fuel_found - fuel_wanted) ** 2)
+    value = 1 / np.sqrt((fuel_found - fuel_wanted) ** 2)
+    # print(value)
+    return value
 
 
 def loss_time_max(time_found: int, time_wanted: int = 0) -> float:
-    return 1 / np.sqrt((time_found - time_wanted) ** 2)
+    value = 1 / np.sqrt((time_found - time_wanted) ** 2)
+    # print(value)
+    return value
 
 
 # Class for Factory method
@@ -47,7 +52,9 @@ class LossFunction:
         elif min_max == 1:
             self.loss_fuel = loss_fuel_max
             self.loss_time = loss_time_max
-
+        print("Parameters : c0 : ", c0)
+        print("c1 : ", c1)
+        print("Min" if min_max == 0 else "Max")
     # Methods to calculate and optimize J with single values
 
     # Loss dependent on fuel and time
@@ -58,7 +65,7 @@ class LossFunction:
         distance = x0[2]
         # iter = math.ceil(x0[3])
         fuel_c, time = compute_maneuver(speed, altitude, distance)
-        return self.loss_fuel(fuel_c, c0) / time
+        return self.loss_fuel(fuel_c, self.c0) / time
 
     # Loss only dependent on fuel
 
@@ -68,7 +75,7 @@ class LossFunction:
         distance = x0[2]
         # iter = math.ceil(x0[3])
         fuel_c, time = compute_maneuver(speed, altitude, distance)
-        return self.loss_fuel(fuel_c, c0)
+        return self.loss_fuel(fuel_c, self.c0)
 
     # Loss only dependent on time
 
@@ -78,7 +85,7 @@ class LossFunction:
         distance = x0[2]
         # iter = math.ceil(x0[3])
         fuel_c, time = compute_maneuver(speed, altitude, distance)
-        return self.loss_time(time, c1)
+        return self.loss_time(time, self.c1)
 
     # Choose associated loss with time as 1, 2 or 3
 
@@ -96,13 +103,13 @@ class LossFunction:
 
     def J_to_compute(self, x0: list) -> float:
         values = get_values_from_list(x0)
-        return self.loss_fuel(values[:, 0], c0) / values[:, 1]
+        return self.loss_fuel(values[:, 0], self.c0) / values[:, 1]
 
     # Dependent only on fuel
 
     def J_to_compute_no_time(self, x0: list) -> float:
         values = get_values_from_list(x0)
-        return self.loss_fuel(values[:, 0], c0)
+        return self.loss_fuel(values[:, 0], self.c0)
 
     # Dependant only on time
 

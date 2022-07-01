@@ -1,4 +1,3 @@
-from function.tools import KNOTS2KMH
 import math
 # average_fuel_consumption 	= 0.003923 l/s # this is highly relative, but good
 # estimates are 36-40l/min = 28-31kg/min = 0.47-0.52kg/s
@@ -6,6 +5,8 @@ import math
 
 
 FUEL_VOLUMIC_MASS = 0.803  # kg / l
+KNOTS2KMH = 1.852  # knots to km/h
+KMH2KNOTS = 0.539957  # km/h to knots
 
 
 # For ULM : 140 is optimal speed so let's say 50%
@@ -15,19 +16,18 @@ FUEL_VOLUMIC_MASS = 0.803  # kg / l
 class Plane:
     def __init__(self, name: str = 'ULM',
                  fuel_consumption_rate: float = 0.0024791,
-                 fuel_max: int = 130, V_OPT: float = 75,
-                 V_3Quarter: float = 97, V_max: float = 107):
+                 fuel_max: int = 130, V_OPT: float = 140,
+                 V_3Quarter: float = 180, V_max: float = 200):
 
         self.name = name
         self.fuel_consumption_rate = fuel_consumption_rate  # l/s
         self.fuel_max = fuel_max  # En litres
-
-        self.V_OPT = V_OPT  # Optimal speed in knots
-        self.V_3Quarter = V_3Quarter
-        self.V_max = V_max  # Max speed in knots
-        self.V_Opt_kmh = round(self.V_OPT * KNOTS2KMH)
-        self.V_3Quarter_kmh = round(self.V_3Quarter * KNOTS2KMH)
-        self.V_max_kmh = round(self.V_max * KNOTS2KMH)
+        self.V_Opt_kmh = V_OPT  # Optimal speed in knots
+        self.V_3Quarter_kmh = V_3Quarter
+        self.V_max_kmh = V_max  # Max speed in knots
+        self.V_OPT = round(self.V_Opt_kmh * KMH2KNOTS)
+        self.V_3Quarter = round(self.V_3Quarter_kmh * KMH2KNOTS)
+        self.V_max = round(self.V_max_kmh * KMH2KNOTS)
         self.max_flight_time = round(
             self.fuel_max / self.fuel_consumption_rate)
         print("Cet avion peut voler pendant ",

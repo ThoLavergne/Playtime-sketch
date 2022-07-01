@@ -1,13 +1,13 @@
 from math import pi
-from tracemalloc import start
 from objects.Maneuver import *
 import scipy.integrate as integrate
-import scipy.special as special
 
 
 class ZigZag(Maneuver):
-    def __init__(self, fullname: str, speed: float,
+    def __init__(self, speed: float,
                  altitude: float, gap: float, zone):
+        # Zone is literaly a zone for the zigzag,
+        # can be a rectangle or square
         self.length = zone[0]
         self.width = zone[1]
         if self.length < gap or self.width < gap:
@@ -15,7 +15,7 @@ class ZigZag(Maneuver):
 
         distance = self.calculate_distance(self.length, self.width, gap)
         print(distance)
-        super().__init__(Maneuver_Mission.Zigzag, fullname, speed,
+        super().__init__(Maneuver_Mission.Zigzag, speed,
                          altitude, distance)
 
     def travel_plan(self) -> list:
@@ -23,7 +23,6 @@ class ZigZag(Maneuver):
         return t_plan
 
     def calculate_distance(self, length: float, width: float, gap: float):
-
         radius = gap / 2
         line = length - gap
         arc = pi * radius
@@ -38,15 +37,17 @@ class ZigZag(Maneuver):
 
 
 class Spiral(Maneuver):
-    def __init__(self, fullname: str, speed: float,
+
+    def __init__(self, speed: float,
                  altitude: float, gap: float, zone):
+        # Zone is literaly a zone for the spiral, and has to be a square
         if zone[0] != zone[1]:
             raise Exception("The zone is not a square")
 
         self.length = zone[0]
         # Let's not do a spiral in a rectangle
         distance = self.calculate_distance(self.length, gap)
-        super().__init__(Maneuver_Mission.Spiral, fullname, speed,
+        super().__init__(Maneuver_Mission.Spiral, speed,
                          altitude, distance)
 
     def travel_plan(self) -> list:
@@ -70,11 +71,11 @@ class Spiral(Maneuver):
 
 class ShowOfForce(Maneuver):
     # maxspeed: int, minspeed: int,
-    def __init__(self, fullname: str):
+    def __init__(self):
         # Normally, there are constant values for everything in the show of
         # force. We can leave parameters but throw fixed value in super.
 
-        super().__init__(Maneuver_Mission.ShowOfForce, fullname, 81,
+        super().__init__(Maneuver_Mission.ShowOfForce,  81,
                          2000, 24.7)
 
     def travel_plan(self) -> list:
@@ -115,9 +116,9 @@ class ShowOfForce(Maneuver):
 
 class Wheel(Maneuver):
     # maxspeed: int, minspeed: int,
-    def __init__(self, fullname: str, meanspeed: int, altitude: float,
+    def __init__(self, meanspeed: int, altitude: float,
                  distance: float,):
-        super().__init__(Maneuver_Mission.Wheel, fullname, meanspeed,
+        super().__init__(Maneuver_Mission.Wheel, meanspeed,
                          altitude, distance,)
 
     def travel_plan(self) -> list:

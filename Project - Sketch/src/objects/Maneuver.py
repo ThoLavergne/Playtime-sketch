@@ -58,14 +58,13 @@ class Mission_Maneuver(Enum):
 
 class Maneuver:
 
-    def __init__(self, name: Maneuver_Mission, fullname: str,
+    def __init__(self, name: Maneuver_Mission,
                  meanspeed: int, altitude: float,
                  distance: float,):
         self.name = name
-        self.fullname = fullname
 
-        self.meanspeed = meanspeed  # In knots
-        self.meanspeed_kmh = round((self.meanspeed * KNOTS2KMH))
+        self.meanspeed_kmh = meanspeed  # In knots
+        self.meanspeed = round((self.meanspeed_kmh * KMH2KNOTS))
 
         self.maxspeed = round(MAXSPEED * KMH2KNOTS)
         self.maxspeed_kmh = MAXSPEED
@@ -83,14 +82,13 @@ class Maneuver:
         #     altitude)
 
         self.distance = distance  # In KM
-        # self.available_mission = name.value
         self.plan = self.travel_plan()
 
     # Calculate the total time travelled during the maneuver
 
     def travelled_time(self) -> float:
         time = sum(p['Time'] for p in self.plan)  # (lambda x : ,)
-        return time
+        return round(time, 2)
 
     # Calculate the total fuel consumption for the full maneuver
 
@@ -99,7 +97,7 @@ class Maneuver:
         total = sum((fuel_consumption_rate
                     (p['Speed'], p['Altitude'], plane)
                     * p['Time']) for p in self.plan)
-        return total
+        return round(total, 2)
 
     def __repr__(self):
         return self.fullname

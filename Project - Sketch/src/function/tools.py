@@ -17,8 +17,7 @@ MAXALTITUDE = 40000  # feet : refer to M2000 max
 
 def get_all_combinations(d: dict) -> dict:
     keys, values = zip(*d.items())
-    ret = [{'metadata': dict(zip(keys, v))}
-           for v in itertools.product(*values)]
+    ret = [dict(zip(keys, v)) for v in itertools.product(*values)]
     return ret
 
 
@@ -40,7 +39,21 @@ def showMatrix(matrix: list):
 
 
 def get_curve_value_alt(altitude: int) -> float:
-    alt = int(altitude - 300)
-    f = np.linspace(0.95, 1.05, MAXALTITUDE - MINALTITUDE)
+    alt = np.asarray(altitude - 300, dtype=np.int32)
+    f = np.linspace(0.90, 1.10, MAXALTITUDE - MINALTITUDE)
 
     return f[alt]
+
+
+# Calculate fuel consumption
+
+def fuel_consumption_rate(speed: float, altitude: float,
+                          plane: Plane,) -> float:
+    # Speed is in km/h, altitude in feet, plane is the object Plane
+    # Kg/s according to a plane's mean consumption rate, speed and altitude
+    alt_ratio = get_curve_value_alt(altitude)
+    spd = speed ** 1.05  # round(speed * KMH2KNOTS)
+    # spd = (speed * 0.2778) ** 2  # **   # m/s
+    fcr = (plane.get_consumption_rate(spd) / alt_ratio)
+    # print(plane.get_consumption_rate(spd), fcr)
+    return fcr
