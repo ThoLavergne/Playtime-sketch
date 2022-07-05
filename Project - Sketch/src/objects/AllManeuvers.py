@@ -1,15 +1,17 @@
 from math import pi
 from objects.Maneuver import *
 import scipy.integrate as integrate
+from inspect import signature
 
 
 class ZigZag(Maneuver):
     def __init__(self, speed: float,
-                 altitude: float, gap: float, zone):
+                 altitude: float, gap: float,
+                 zone_length: float, zone_width: float):
         # Zone is literaly a zone for the zigzag,
         # can be a rectangle or square
-        self.length = zone[0]
-        self.width = zone[1]
+        self.length = zone_length
+        self.width = zone_width
         if self.length < gap or self.width < gap:
             raise Exception("Length or width is too small")
 
@@ -18,10 +20,7 @@ class ZigZag(Maneuver):
         super().__init__(Maneuver_Mission.Zigzag, speed,
                          altitude, distance)
 
-    def travel_plan(self) -> list:
-        t_plan = []
-        return t_plan
-
+    # Calculate the total length of zigzag
     def calculate_distance(self, length: float, width: float, gap: float):
         radius = gap / 2
         line = length - gap
@@ -35,25 +34,31 @@ class ZigZag(Maneuver):
 
         return distance
 
+    def travel_plan(self) -> list:
+        return super().travel_plan()
+
+    @classmethod
+    def _nb_param_(cls):
+        return len(signature(cls.__init__).parameters)
+
 
 class Spiral(Maneuver):
 
     def __init__(self, speed: float,
-                 altitude: float, gap: float, zone):
-        # Zone is literaly a zone for the spiral, and has to be a square
-        if zone[0] != zone[1]:
-            raise Exception("The zone is not a square")
+                 altitude: float, gap: float,
+                 zone_length: float):
 
-        self.length = zone[0]
+        # Zone is literaly a zone for the spiral, and has to be a square
+        self.length = zone_length
         # Let's not do a spiral in a rectangle
         distance = self.calculate_distance(self.length, gap)
         super().__init__(Maneuver_Mission.Spiral, speed,
                          altitude, distance)
 
     def travel_plan(self) -> list:
-        t_plan = []
-        return t_plan
+        return super().travel_plan()
 
+    # Calculate the total length of Spiral
     def calculate_distance(self, length: float, gap: float):
         # Source : https://planetcalc.com/9063 (https://fr.planetcalc.com/9063)
         # https://www.intmath.com/blog/mathematics/length-of-an-archimedean-spiral-6595
@@ -68,6 +73,10 @@ class Spiral(Maneuver):
         print(distance)
         return distance[0]
 
+    @classmethod
+    def _nb_param_(cls):
+        return len(signature(cls.__init__).parameters)
+
 
 class ShowOfForce(Maneuver):
     # maxspeed: int, minspeed: int,
@@ -75,7 +84,7 @@ class ShowOfForce(Maneuver):
         # Normally, there are constant values for everything in the show of
         # force. We can leave parameters but throw fixed value in super.
 
-        super().__init__(Maneuver_Mission.ShowOfForce,  81,
+        super().__init__(Maneuver_Mission.ShowOfForce, 150,
                          2000, 24.7)
 
     def travel_plan(self) -> list:
@@ -111,13 +120,19 @@ class ShowOfForce(Maneuver):
 
         return t_plan
 
+    @classmethod
+    def _nb_param_(cls):
+        return len(signature(cls.__init__).parameters)
+
 
 # Particular maneuver : circle above the objective
 
 class Wheel(Maneuver):
     # maxspeed: int, minspeed: int,
     def __init__(self, meanspeed: int, altitude: float,
-                 distance: float,):
+                 radius: float,):
+        self.radius = radius
+        distance = self.calculate_circle(radius) + STRAIGHT_LINE_WHEEL
         super().__init__(Maneuver_Mission.Wheel, meanspeed,
                          altitude, distance,)
 
@@ -130,25 +145,36 @@ class Wheel(Maneuver):
 
         first = dict()
         first['Speed'] = self.meanspeed_kmh
-        first['Distance'] = MINDISTWHEEL
+        first['Distance'] = self.calculate_circle(self.radius)
         first['Altitude'] = self.altitude
-        first['Time'] = MINDISTWHEEL / (self.meanspeed_kmh / 3600)
+        first['Time'] = first['Distance'] / (self.meanspeed_kmh / 3600)
         t_plan.append(first)
 
         second = dict()
         second['Speed'] = self.minspeed_kmh
-        second['Distance'] = 0.5
+        second['Distance'] = STRAIGHT_LINE_WHEEL / 4
         second['Altitude'] = ((self.altitude / 2) if (self.altitude / 2) >
                               self.minaltitude else self.minaltitude)
-        second['Time'] = 0.5 / (self.minspeed_kmh / 3600)
+        second['Time'] = second['Distance'] / (self.minspeed_kmh / 3600)
         t_plan.append(second)
 
         third = dict()
         third['Speed'] = self.maxspeed_kmh
-        third['Distance'] = self.distance - MINDISTWHEEL - 0.5
+        third['Distance'] = STRAIGHT_LINE_WHEEL * 3 / 4
         third['Altitude'] = ((self.altitude / 2) if (self.altitude / 2) >
                              self.minaltitude else self.minaltitude)
         third['Time'] = third['Distance'] / (third['Speed'] / 3600)
         t_plan.append(third)
 
         return t_plan
+
+    # Calculate circle length
+    def calculate_circle(self, radius: float, ):
+        return (2 * pi * radius)
+
+    @classmethod
+    def _nb_param_(cls):
+        return len(signature(cls.__init__).parameters)
+
+
+LIST_MAN = [Wheel, ShowOfForce, Spiral, ZigZag]

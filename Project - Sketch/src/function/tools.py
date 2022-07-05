@@ -10,7 +10,7 @@ FT2M = 0.3048  # Feet to meters
 M2FT = 3.281  # Meters to feet
 
 MINALTITUDE = 300  # feet : will be set with the type of terrain
-MAXALTITUDE = 40000  # feet : refer to M2000 max
+MAXALTITUDE = 30000  # feet : refer to M2000 max
 
 # Get a list for all combinations in dict
 
@@ -43,17 +43,3 @@ def get_curve_value_alt(altitude: int) -> float:
     f = np.linspace(0.90, 1.10, MAXALTITUDE - MINALTITUDE)
 
     return f[alt]
-
-
-# Calculate fuel consumption
-
-def fuel_consumption_rate(speed: float, altitude: float,
-                          plane: Plane,) -> float:
-    # Speed is in km/h, altitude in feet, plane is the object Plane
-    # Kg/s according to a plane's mean consumption rate, speed and altitude
-    alt_ratio = get_curve_value_alt(altitude)
-    spd = speed ** 1.05  # round(speed * KMH2KNOTS)
-    # spd = (speed * 0.2778) ** 2  # **   # m/s
-    fcr = (plane.get_consumption_rate(spd) / alt_ratio)
-    # print(plane.get_consumption_rate(spd), fcr)
-    return fcr

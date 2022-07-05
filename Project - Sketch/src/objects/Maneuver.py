@@ -4,15 +4,18 @@ from function.tools import *
 import math
 
 
-MINDISTWHEEL = 2.5  # KM : used for the straight line above the objective
+STRAIGHT_LINE_WHEEL = 2  # KM : used for the straight line above the objective
+RADIUS_MIN_WHEEL = 2  # KM
+RADIUS_MAX_WHEEL = 5  # KM
 
 STRAIGHT_LINE_SF = 10  # KM : used for the straight line to go next to the
-ARC_SF = 4.7  # KM : used for the arc between the two straight lines
+ARC_SF = 4.7  # KM :
+# used for the arc between the two straight lines
 # objective and another one above the objective
 
 
 MINSPEED = 100  # KM/H : used for reference for ULM
-MAXSPEED = 245  # KM/H : used for reference for ULM
+MAXSPEED = 200  # KM/H : used for reference for ULM
 
 CONSTK1 = 0.0049
 
@@ -60,10 +63,11 @@ class Maneuver:
 
     def __init__(self, name: Maneuver_Mission,
                  meanspeed: int, altitude: float,
-                 distance: float,):
+                 distance: float,
+                 ):
         self.name = name
 
-        self.meanspeed_kmh = meanspeed  # In knots
+        self.meanspeed_kmh = meanspeed  # In kmh
         self.meanspeed = round((self.meanspeed_kmh * KMH2KNOTS))
 
         self.maxspeed = round(MAXSPEED * KMH2KNOTS)
@@ -108,7 +112,6 @@ class Maneuver:
     # Return a list of sequence for the maneuver with an associated speed,
     # distance, altitude and time for each sequence.
     # Used to calculate the cost for every sequence.
-
     def travel_plan(self) -> list:
         t_plan = []
         plan = dict()
