@@ -43,3 +43,10 @@ def get_curve_value_alt(altitude: int) -> float:
     f = np.linspace(0.90, 1.10, MAXALTITUDE - MINALTITUDE)
 
     return f[alt]
+
+
+def get_key_from_value(d, val):
+    keys = [k for k, v in d.items() if v == val]
+    if keys:
+        return keys[0]
+    return None

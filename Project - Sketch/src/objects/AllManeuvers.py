@@ -16,7 +16,6 @@ class ZigZag(Maneuver):
             raise Exception("Length or width is too small")
 
         distance = self.calculate_distance(self.length, self.width, gap)
-        print(distance)
         super().__init__(Maneuver_Mission.Zigzag, speed,
                          altitude, distance)
 
@@ -70,7 +69,6 @@ class Spiral(Maneuver):
         distance = integrate.quad(lambda theta:
                                   np.sqrt((b * theta) ** 2 + b ** 2),
                                   start_theta, end_theta)
-        print(distance)
         return distance[0]
 
     @classmethod

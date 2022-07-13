@@ -85,7 +85,7 @@ class Maneuver:
         #     raise Exception("Altitude is not between min and max : ",
         #     altitude)
 
-        self.distance = distance  # In KM
+        self.distance = round(distance, 2)  # In KM
         self.plan = self.travel_plan()
 
     # Calculate the total time travelled during the maneuver
@@ -104,10 +104,10 @@ class Maneuver:
         return round(total, 2)
 
     def __repr__(self):
-        return self.fullname
+        return self.name
 
     def __str__(self):
-        return self.fullname
+        return self.name.name
 
     # Return a list of sequence for the maneuver with an associated speed,
     # distance, altitude and time for each sequence.
@@ -118,7 +118,7 @@ class Maneuver:
         plan['Speed'] = self.meanspeed_kmh
         plan['Distance'] = self.distance
         plan['Altitude'] = self.altitude
-        plan['Time'] = plan['Speed'] / plan['Distance'] / 3600
+        plan['Time'] = plan['Distance'] / (plan['Speed'] / 3600)
         t_plan.append(plan)
 
         return t_plan
