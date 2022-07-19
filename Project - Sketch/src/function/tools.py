@@ -9,9 +9,6 @@ KMH2KNOTS = 0.539957  # km/h to knots
 FT2M = 0.3048  # Feet to meters
 M2FT = 3.281  # Meters to feet
 
-MINALTITUDE = 300  # feet : will be set with the type of terrain
-MAXALTITUDE = 30000  # feet : refer to M2000 max
-
 # Get a list for all combinations in dict
 
 
@@ -38,9 +35,9 @@ def showMatrix(matrix: list):
     plt.show()
 
 
-def get_curve_value_alt(altitude: int) -> float:
-    alt = np.asarray(altitude - 300, dtype=np.int32)
-    f = np.linspace(0.90, 1.10, MAXALTITUDE - MINALTITUDE)
+def get_curve_value_alt(altitude: int, plane) -> float:
+    alt = np.asarray(altitude - plane.MINALTITUDE, dtype=np.int32)
+    f = np.linspace(0.90, 1.10, plane.MAXALTITUDE - plane.MINALTITUDE)
 
     return f[alt]
 

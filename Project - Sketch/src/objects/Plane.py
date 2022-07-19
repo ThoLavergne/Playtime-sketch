@@ -16,18 +16,29 @@ KMH2KNOTS = 0.539957  # km/h to knots
 class Plane:
     def __init__(self, name: str = 'ULM',
                  fuel_consumption_rate: float = 0.0024791,
-                 fuel_max: int = 130, V_OPT: float = 140,
-                 V_3Quarter: float = 180, V_max: float = 200):
+                 fuel_max: int = 130,  V_min: float = 100,
+                 V_OPT: float = 140, V_3Quarter: float = 180,
+                 V_max: float = 200, MINALTITUDE: int = 300,
+                 MAXALTITUDE: int = 16500):
 
         self.name = name
         self.fuel_consumption_rate = fuel_consumption_rate  # l/s
-        self.fuel_max = fuel_max  # En litres
-        self.V_Opt_kmh = V_OPT  # Optimal speed in knots
-        self.V_3Quarter_kmh = V_3Quarter
-        self.V_max_kmh = V_max  # Max speed in knots
-        self.V_OPT = round(self.V_Opt_kmh * KMH2KNOTS)
-        self.V_3Quarter = round(self.V_3Quarter_kmh * KMH2KNOTS)
-        self.V_max = round(self.V_max_kmh * KMH2KNOTS)
+
+        self.fuel_max = fuel_max  # Liters
+
+        self.V_OPT = V_OPT  # Optimal speed in km/h
+        self.V_3Quarter = V_3Quarter
+        self.MAXSPEED = V_max  # Max speed in km/h
+        self.MINSPEED = V_min
+        # self.V_OPT = round(self.V_Opt_kmh * KMH2KNOTS)
+        # self.V_3Quarter = round(self.V_3Quarter_kmh * KMH2KNOTS)
+        # self.V_max = round(self.V_max_kmh * KMH2KNOTS)
+
+        # TODO
+        self.MINALTITUDE = MINALTITUDE  # feet :
+        # will be set with the type of terrain
+        self.MAXALTITUDE = MAXALTITUDE  # feet
+
         self.max_flight_time = round(
             self.fuel_max / self.fuel_consumption_rate)
         print("Cet avion peut voler pendant ",
@@ -35,11 +46,11 @@ class Plane:
               " s, soit ",
               math.floor(self.max_flight_time / 60),
               " min, soit",
-              round((self.max_flight_time / 3600) * self.V_Opt_kmh),
+              round((self.max_flight_time / 3600) * self.V_OPT),
               " km à une vitesse moyenne de ",
-              self.V_Opt_kmh,
+              self.V_OPT,
               " km/h et sa vitesse max sera de ",
-              self.V_max_kmh,
+              self.MAXSPEED,
               " km/h")
 
     def __repr__(self):
@@ -53,7 +64,7 @@ class Plane:
     def get_consumption_rate(self, speed: float) -> float:
         # Speed in m/s
         return self.fuel_consumption_rate * speed / (
-                self.V_Opt_kmh ** 0.95
+                self.V_OPT ** 0.95
                 )
 
 
