@@ -27,6 +27,7 @@ class Maneuver_Mission(Enum):
     ShowOfForce = 2
     Spiral = 3
     Zigzag = 4
+    SimpleMove = 5
 
 
 # Every type of mission available, associated with maneuvers
@@ -43,11 +44,18 @@ class Mission_Maneuver(Enum):
 
     # Get the available maneuvers for the mission
 
-    def getManeuver(self):
+    def getManeuvers(self):
         if self.value == 1:
-            return [Maneuver_Mission.Wheel, Maneuver_Mission.ShowOfForce]
+            return [Maneuver_Mission.Wheel, Maneuver_Mission.ShowOfForce,
+                    Maneuver_Mission.Spiral, Maneuver_Mission.Zigzag,
+                    # Maneuver_Mission.SimpleMove
+                    ]
+        # No difference for now
         elif self.value == 2:
-            return [Maneuver_Mission.Wheel, Maneuver_Mission.ShowOfForce]
+            return [Maneuver_Mission.Wheel, Maneuver_Mission.ShowOfForce,
+                    Maneuver_Mission.Spiral, Maneuver_Mission.Zigzag,
+                    # Maneuver_Mission.SimpleMove
+                    ]
 
     def getMinManeuver(self):
         if self.value == 1:
@@ -63,22 +71,24 @@ class Maneuver:
 
     def __init__(self, name: Maneuver_Mission,
                  meanspeed: int, altitude: float,
-                 distance: float,
+                 distance: float, plane: Plane
                  ):
         self.name = name
+        self.plane = plane
 
-        self.meanspeed_kmh = meanspeed  # In kmh
-        self.meanspeed = round((self.meanspeed_kmh * KMH2KNOTS))
+        self.meanspeed = meanspeed  # In kmh
+        # self.meanspeed = round((self.meanspeed_kmh * KMH2KNOTS))
 
-        self.maxspeed = round(MAXSPEED * KMH2KNOTS)
-        self.maxspeed_kmh = MAXSPEED
+        self.maxspeed = self.plane.MAXSPEED  # In kmh
+        # self.maxspeed = round(self.plane.MAXSPEED * KMH2KNOTS)
 
-        self.minspeed = round(MINSPEED * KMH2KNOTS)
-        self.minspeed_kmh = MINSPEED
+        self.minspeed = self.plane.MINSPEED  # In kmh
+        # self.minspeed = round(self.plane.MINSPEED * KMH2KNOTS)
 
-        self.minaltitude = MINALTITUDE
-        self.maxaltitude = MAXALTITUDE
+        self.minaltitude = plane.MINALTITUDE
+        self.maxaltitude = plane.MAXALTITUDE
         self.altitude = altitude
+
         # if altitude >= self.minaltitude and altitude <= self.maxaltitude:
         #     self.altitude = altitude  # In feet
         # else:
@@ -96,10 +106,10 @@ class Maneuver:
 
     # Calculate the total fuel consumption for the full maneuver
 
-    def total_fuel_consumption(self, plane: Plane) -> float:
+    def total_fuel_consumption(self) -> float:
         # Kg according to the travelled time.
         total = sum((fuel_consumption_rate
-                    (p['Speed'], p['Altitude'], plane)
+                    (p['Speed'], p['Altitude'], self.plane)
                     * p['Time']) for p in self.plan)
         return round(total, 2)
 
@@ -115,7 +125,7 @@ class Maneuver:
     def travel_plan(self) -> list:
         t_plan = []
         plan = dict()
-        plan['Speed'] = self.meanspeed_kmh
+        plan['Speed'] = self.meanspeed
         plan['Distance'] = self.distance
         plan['Altitude'] = self.altitude
         plan['Time'] = plan['Distance'] / (plan['Speed'] / 3600)
@@ -130,7 +140,7 @@ def fuel_consumption_rate(speed: float, altitude: float,
                           plane: Plane,) -> float:
     # Speed is in km/h, altitude in feet, plane is the object Plane
     # Kg/s according to a plane's mean consumption rate, speed and altitude
-    alt_ratio = get_curve_value_alt(altitude)
+    alt_ratio = get_curve_value_alt(altitude, plane)
     spd = speed ** 1.05  # round(speed * KMH2KNOTS)
     # spd = (speed * 0.2778) ** 2  # **   # m/s
     fcr = (plane.get_consumption_rate(spd) / alt_ratio)

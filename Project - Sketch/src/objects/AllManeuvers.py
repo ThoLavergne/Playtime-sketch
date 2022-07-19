@@ -5,9 +5,8 @@ from inspect import signature
 
 
 class ZigZag(Maneuver):
-    def __init__(self, speed: float,
-                 altitude: float, gap: float,
-                 zone_length: float, zone_width: float):
+    def __init__(self, speed: float, altitude: float, gap: float,
+                 zone_length: float, zone_width: float, plane: Plane):
         # Zone is literaly a zone for the zigzag,
         # can be a rectangle or square
         self.length = zone_length
@@ -17,10 +16,11 @@ class ZigZag(Maneuver):
 
         distance = self.calculate_distance(self.length, self.width, gap)
         super().__init__(Maneuver_Mission.Zigzag, speed,
-                         altitude, distance)
+                         altitude, distance, plane)
 
     # Calculate the total length of zigzag
-    def calculate_distance(self, length: float, width: float, gap: float):
+    def calculate_distance(self, length: float, width: float,
+                           gap: float):
         radius = gap / 2
         line = length - gap
         arc = pi * radius
@@ -43,16 +43,15 @@ class ZigZag(Maneuver):
 
 class Spiral(Maneuver):
 
-    def __init__(self, speed: float,
-                 altitude: float, gap: float,
-                 zone_length: float):
+    def __init__(self, speed: float, altitude: float, gap: float,
+                 zone_length: float, plane: Plane):
 
         # Zone is literaly a zone for the spiral, and has to be a square
         self.length = zone_length
         # Let's not do a spiral in a rectangle
         distance = self.calculate_distance(self.length, gap)
         super().__init__(Maneuver_Mission.Spiral, speed,
-                         altitude, distance)
+                         altitude, distance, plane)
 
     def travel_plan(self) -> list:
         return super().travel_plan()
@@ -78,12 +77,12 @@ class Spiral(Maneuver):
 
 class ShowOfForce(Maneuver):
     # maxspeed: int, minspeed: int,
-    def __init__(self):
+    def __init__(self, meanspeed: int, plane: Plane):
         # Normally, there are constant values for everything in the show of
         # force. We can leave parameters but throw fixed value in super.
 
-        super().__init__(Maneuver_Mission.ShowOfForce, 150,
-                         2000, 24.7)
+        super().__init__(Maneuver_Mission.ShowOfForce, meanspeed,
+                         2000, 24.7, plane)
 
     def travel_plan(self) -> list:
         # Add few steps in the show of force : first is a line at meanspeed
@@ -94,22 +93,22 @@ class ShowOfForce(Maneuver):
         t_plan = []
 
         first = dict()
-        first['Speed'] = self.meanspeed_kmh
+        first['Speed'] = self.meanspeed
         first['Distance'] = STRAIGHT_LINE_SF
         first['Altitude'] = self.altitude
-        first['Time'] = STRAIGHT_LINE_SF / (self.meanspeed_kmh / 3600)
+        first['Time'] = first['Distance'] / (first['Speed'] / 3600)
         t_plan.append(first)
 
         second = dict()
-        second['Speed'] = self.minspeed_kmh
+        second['Speed'] = self.minspeed
         second['Distance'] = 4.7
         second['Altitude'] = ((self.altitude * (3/2)) if (self.altitude * 3/2)
                               < self.maxaltitude else self.maxaltitude)
-        second['Time'] = 2 / (self.minspeed_kmh / 3600)
+        second['Time'] = second['Distance'] / (second['Speed'] / 3600)
         t_plan.append(second)
 
         third = dict()
-        third['Speed'] = self.maxspeed_kmh
+        third['Speed'] = self.maxspeed
         third['Distance'] = STRAIGHT_LINE_SF
         third['Altitude'] = ((self.altitude / 2) if (self.altitude / 2) >
                              self.minaltitude else self.minaltitude)
@@ -128,11 +127,11 @@ class ShowOfForce(Maneuver):
 class Wheel(Maneuver):
     # maxspeed: int, minspeed: int,
     def __init__(self, meanspeed: int, altitude: float,
-                 radius: float,):
+                 radius: float, plane: Plane):
         self.radius = radius
         distance = self.calculate_circle(radius) + STRAIGHT_LINE_WHEEL
         super().__init__(Maneuver_Mission.Wheel, meanspeed,
-                         altitude, distance,)
+                         altitude, distance, plane)
 
     def travel_plan(self) -> list:
         # Add few steps in the wheel : first is a circle at meanspeed
@@ -142,22 +141,22 @@ class Wheel(Maneuver):
         t_plan = []
 
         first = dict()
-        first['Speed'] = self.meanspeed_kmh
+        first['Speed'] = self.meanspeed
         first['Distance'] = self.calculate_circle(self.radius)
         first['Altitude'] = self.altitude
-        first['Time'] = first['Distance'] / (self.meanspeed_kmh / 3600)
+        first['Time'] = first['Distance'] / (first['Speed'] / 3600)
         t_plan.append(first)
 
         second = dict()
-        second['Speed'] = self.minspeed_kmh
+        second['Speed'] = self.minspeed
         second['Distance'] = STRAIGHT_LINE_WHEEL / 4
         second['Altitude'] = ((self.altitude / 2) if (self.altitude / 2) >
                               self.minaltitude else self.minaltitude)
-        second['Time'] = second['Distance'] / (self.minspeed_kmh / 3600)
+        second['Time'] = second['Distance'] / (second['Speed'] / 3600)
         t_plan.append(second)
 
         third = dict()
-        third['Speed'] = self.maxspeed_kmh
+        third['Speed'] = self.maxspeed
         third['Distance'] = STRAIGHT_LINE_WHEEL * 3 / 4
         third['Altitude'] = ((self.altitude / 2) if (self.altitude / 2) >
                              self.minaltitude else self.minaltitude)

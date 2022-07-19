@@ -24,17 +24,19 @@ class PlaytimeEnv(gym.Env):
         # Do we have to add gameplan parameters to observation ?
         # Seems legit : the agent has to see those parameters to determine
         # Or, we give our agent the gameplan parameters in order to predict
+
         self.gameplan_list = gameplan_list
+        # Set maneuver list or maneuvers done to an empty list.
         self.maneuver_list = []
         # TODO : add other parameters for gameplan like objectives,
         # time constraint, changing wind
-        self.reset_action_space()
 
         # We create dictionnaries for an enconding similar to onehot
         # in order to create our observation space
-        self.plane_index = {
-            0: ULM
-        }
+        planes = list(set(gp['Plane'] for gp in self.gameplan_list))
+        self.plane_index = dict()
+        for i, p in enumerate(planes):
+            self.plane_index[i] = p
 
         # We fetch the max fuel quantity in order to create the
         # first observation space.
@@ -43,29 +45,30 @@ class PlaytimeEnv(gym.Env):
             if plane.fuel_max > maxfuel:
                 maxfuel = plane.fuel_max
 
-        self.strength_index = {
-            0: "Weak",
-            1: "Equal",
-            2: "Strong"
-        }
+        strength = list(set(gp['Strength'] for gp in self.gameplan_list))
+        self.strength_index = dict()
+        for i, s in enumerate(strength):
+            self.strength_index[i] = s
 
-        self.meteo_index = {
-            0: "Sunny",
-            1: "Cloudy",
-            2: "Misty"
-        }
+        meteo = list(set(gp['Meteo'] for gp in self.gameplan_list))
+        self.meteo_index = dict()
+        for i, m in enumerate(meteo):
+            self.meteo_index[i] = m
 
-        self.missionType_index = {
-            0: Mission_Maneuver.SCAR,
-            1: Mission_Maneuver.CAS
-        }
+        missionType = list(set(gp['MissionType'] for gp in self.gameplan_list))
+        self.missionType_index = dict()
+        for i, mt in enumerate(missionType):
+            self.missionType_index[i] = mt
 
-        self.maneuvers_index = {
-            0: Wheel,
-            1: ShowOfForce,
-            2: Spiral,
-            3: ZigZag
-        }
+        maneuvers = list(set(
+                        filter(lambda x:
+                               (x.name in gp['MissionType'].getManeuvers()
+                                for gp in self.gameplan_list), LIST_MAN)))
+        self.maneuvers_index = dict()
+        for i, ma in enumerate(maneuvers):
+            self.maneuvers_index[i] = ma
+
+        # End onehot index
 
         # Let's set the action space with the maneuvers' parameters
         # Change parameters according to plane parameters or others
@@ -86,6 +89,7 @@ class PlaytimeEnv(gym.Env):
             "SynchroTime": spaces.Discrete(6000)
         })
 
+        # Name of all parameters in the action space.
         self.action_index = [
             'maneuver',
             'speed',
@@ -96,6 +100,24 @@ class PlaytimeEnv(gym.Env):
             'width',
             'radius'
         ]
+        self.action_space = spaces.MultiDiscrete(
+            [
+                len(self.maneuvers_index),
+                max(p.MAXSPEED - p.MINSPEED for p in
+                    self.plane_index.values()) / 5,
+                max(p.MAXALTITUDE - p.MINALTITUDE for p in
+                    self.plane_index.values()) / 100,
+                max(max(gp['GoalDistance'] for gp in self.gameplan_list),
+                    max(gp['RtBDistance'] for gp in self.gameplan_list)),
+                4,
+                15,
+                15,
+                4
+            ]
+        )
+
+        # self.get_new_gameplan()
+        # self.reset_action_space()
 
     # Step for the current episode
     # Can change some parameters, for example changing power balance,
@@ -111,18 +133,19 @@ class PlaytimeEnv(gym.Env):
         maneuver = self.maneuvers_index[action['maneuver']]
         if maneuver == Wheel:
             maneuver = maneuver(action['speed'], action['altitude'],
-                                action['radius'])
+                                action['radius'], self.plane)
         elif maneuver == ShowOfForce:
-            maneuver = maneuver()
+            maneuver = maneuver(action['speed'], self.plane)
         elif maneuver == Spiral:
             maneuver = maneuver(action['speed'], action['altitude'],
-                                action['gap'], action['length'])
+                                action['gap'], action['length'],
+                                self.plane)
         elif maneuver == ZigZag:
             maneuver = maneuver(action['speed'], action['altitude'],
                                 action['gap'], action['length'],
-                                action['width'])
+                                action['width'], self.plane)
 
-        fuel = maneuver.total_fuel_consumption(self.plane)
+        fuel = maneuver.total_fuel_consumption()
         time = maneuver.travelled_time()
         self.state_to_add = {'fuel': fuel,
                              'time': time}
@@ -139,18 +162,32 @@ class PlaytimeEnv(gym.Env):
         # print("Current state : ", self.state)
         return (self.state, reward, done, info)
 
+    # Raise the action_space to the real interval
     def action_to_real_space(self, action):
-        action['speed'] += (MINSPEED / 5)
         action['speed'] *= 5
-
-        action['altitude'] += (MINALTITUDE / 100)
+        action['speed'] += self.plane.MINSPEED
+        if self.strength != "Strong":
+            action['speed'] += self.action_change['speed']
+            # if self.strength == "Weak":
+            #     print(action['speed'])
         action['altitude'] *= 100
-
+        action['altitude'] += self.plane.MINALTITUDE
+        # If meteo is not sunny then we do not raise the threshold
+        # if self.meteo != "Sunny":
+        #     action['altitude'] += self.action_change['altitude']
         action['distance'] += 15
+
         action['gap'] += 2
+        # If meteo is not sunny, then we do not raise the threshold
+        # and keep it low.
         action['length'] += 15
         action['width'] += 15
+
         action['radius'] += 2
+        if self.strength == "Weak":
+            action['radius'] += self.action_change['radius']
+        # We raise the threshold only if we are weaker.
+
         return action
 
     # Set new episode : select new gameplan so new observation
@@ -174,6 +211,10 @@ class PlaytimeEnv(gym.Env):
         self.state['Strength'] = get_key_from_value(self.strength_index,
                                                     self.state['Strength'])
 
+        # TODO : Consider bingo distance and objective distance in the fuel
+        # Add a maneuver ?
+        # Need to consider the choice of speed in policy.
+
         # print("Reset, new obs : ", self.state)
         if verbose:
             print("Fuel, Tmin, Tsync : ", self.fuel,
@@ -181,7 +222,7 @@ class PlaytimeEnv(gym.Env):
 
         return self.state
 
-    # TODO
+    # TODO ? :
     # Visualize the environment, we can consider a 2D env in which
     # the situation can evolve.
     def render(self, mode='human', close=False):
@@ -205,6 +246,7 @@ class PlaytimeEnv(gym.Env):
         # with target and observation as parameters.
         reward = 0
 
+        # TODO Change to make this impossible to get
         # If we consume too much fuel, super negative reward
         if self.fuel - self.state['fuel'] <= 0:
             print("Too much fuel consumed")
@@ -218,12 +260,14 @@ class PlaytimeEnv(gym.Env):
         else:
             reward += 200
 
+        # TODO Change to make this impossible to get
         # If we have value that are not allowed within the range, neg reward
         if (action.meanspeed < action.minspeed) | (
             action.meanspeed > action.maxspeed) | (
              action.altitude < action.minaltitude) | (
              action.altitude > action.maxaltitude):
             print("Bad altitude or bad speed")
+            print(self.gameplan)
             reward -= 99999
 
         # If we have a synchro time needed and we are close to this time
@@ -250,13 +294,14 @@ class PlaytimeEnv(gym.Env):
         if self.timeMin != 0:
             reward += self.state['time'] - self.synchroTime
 
-        # Ponderer avec un ratio TODO
+        # TODO : Ponderer avec un ratio
         return round(reward)
 
     # Set a new gameplan for the current episode.
     # Change with reset
     def get_new_gameplan(self):
         r = np.random.randint(0, len(self.gameplan_list))
+
         self.gameplan = self.gameplan_list[r]
         self.plane = self.gameplan['Plane']
         self.goalDistance = self.gameplan['GoalDistance']
@@ -278,13 +323,74 @@ class PlaytimeEnv(gym.Env):
                 count[man.name] = 1
         return count
 
+    # Set new action space for our environment.
+    # TODO According to gameplan parameters
     def reset_action_space(self):
         # Change function in order to consider parameters
         # For example, strength, meteo etc.
+        self.action_change = dict().fromkeys(self.action_index, 0)
+        # Number of maneuvers that can be done
+        maneuvers_nb = len(self.missionType.getManeuvers())
+
+        # Speed interval (/5 to narrow done the interval)
+        # TODO : WIP
+        # Decrease MAXSPEED if strong
+        # Increase MINSPEED if weak or equal
+        spd_interval = (self.plane.MAXSPEED - self.plane.MINSPEED)
+        if self.strength != "Weak":
+            self.action_change['speed'] = 10
+        else:
+            self.action_change['speed'] = 30
+
+        spd_interval -= self.action_change['speed']
+        spd_interval /= 5
+
+        # Altitude interval (/100 to narrow done the interval)
+        # TODO
+        # Decrease a lot MAXALT if bad weather
+        alt_interval = (self.plane.MAXALTITUDE - self.plane.MINALTITUDE)
+        if self.meteo != "Sunny":
+            self.action_change['altitude'] = 10000
+        alt_interval -= self.action_change['altitude']
+        alt_interval /= 100
+
+        # Distance interval (Only usable for SimpleMove)
+        # TODO
+        dist_interval = 15
+
+        # Gap interval (Used in Spiral and Zigzag)
+        # TODO
+        # Decrease if bad weather
+        gap_interval = 4
+        if self.meteo != "Sunny":
+            self.action_change['gap'] = 2
+        gap_interval -= self.action_change['gap']
+
+        # Width and Length interval (Used for the zone in Spiral and Zigzag)
+        # TODO
+        # Maybe not affected in the prediction
+        wid_len_interval = 15
+
+        # Radius interval (Used for Wheel)
+        # TODO
+        # Decrease if bad weather
+        # Increase if weaker
+        rad_interval = 3
+        if self.meteo != "Sunny" or self.strength == "Weak":
+            self.action_change['radius'] = 1.5
+        rad_interval += self.action_change['radius']
+
         self.action_space = spaces.MultiDiscrete(
-            [4, (MAXSPEED - MINSPEED) / 5, (MAXALTITUDE - MINALTITUDE) / 100,
-             15, 4, 15, 15, 3]
-        )
+            [
+                maneuvers_nb,
+                spd_interval,
+                alt_interval,
+                dist_interval,
+                gap_interval,
+                wid_len_interval,
+                wid_len_interval,
+                rad_interval
+             ])
 
     # Check if current episode is done
     # TODO, for now considering only fuel remaining and time
@@ -297,7 +403,7 @@ class PlaytimeEnv(gym.Env):
                self.done_min_time() and self.done_sync_time())
         return done
 
-    # Check for current episode time
+    # Check for current episode time if synchro time is near or done
     def done_sync_time(self):
         # Define what to do when there is no up-limit for time
         # Define what to do when there is no down-limit for time
@@ -307,11 +413,16 @@ class PlaytimeEnv(gym.Env):
             return (abs(self.state['time'] - self.synchroTime) <= 30) or (
                     self.state['time'] > self.synchroTime)
 
+    # Check for current episode time if minimum time is done
     def done_min_time(self):
         if self.timeMin == 0:
             return True
         else:
             return self.state['time'] >= self.timeMin
 
+    # Check for current episode if fuel consumed is above the limit
+    # TODO : Change and set it done before everything is consumed
     def done_fuel(self):
-        return self.state['fuel'] >= self.fuel
+        return ((self.state['fuel'] - self.fuel) < 1 and
+                self.state['fuel'] - self.fuel >= 0) or (
+                self.state['fuel'] >= self.fuel)
