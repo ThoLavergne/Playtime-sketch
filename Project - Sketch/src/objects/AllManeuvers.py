@@ -3,12 +3,40 @@ from objects.Maneuver import *
 import scipy.integrate as integrate
 from inspect import signature
 
+# For all those maneuvers, check the Playtime's Miro to have more details
+# Some parameters may differ.
+
+
+# Recon maneuver, sweep / scan zone.
 
 class ZigZag(Maneuver):
     def __init__(self, speed: float, altitude: float, gap: float,
                  zone_length: float, zone_width: float, plane: Plane):
+        """Zigzag or Radiator maneuver
+
+        Parameters
+        ----------
+        speed : float
+            Mean speed for the maneuver (km/h)
+        altitude : float
+            Mean altitude for the maneuver (feet)
+        gap : float
+            Gap between each pass through (km)
+        zone_length : float
+            Length of the zone to scan (km)
+        zone_width : float
+            Width of the zone to scan (km)
+        plane : Plane
+            Type of plane
+
+        Raises
+        ------
+        Exception
+            If the length or the width is smaller than the gap
+        """
         # Zone is literaly a zone for the zigzag,
         # can be a rectangle or square
+        self.gap = gap
         self.length = zone_length
         self.width = zone_width
         if self.length < gap or self.width < gap:
@@ -20,44 +48,91 @@ class ZigZag(Maneuver):
 
     # Calculate the total length of zigzag
     def calculate_distance(self, length: float, width: float,
-                           gap: float):
+                           gap: float) -> float:
+        """Calculate the travelled distance for the zigzag / radiator
+
+        Parameters
+        ----------
+        length : float
+            Length of the zone to scan (km)
+        width : float
+            Width of the zone to scan (km)
+        gap : float
+            Gap between each pass through (km)
+
+        Returns
+        -------
+        float
+            Travelled distance
+        """
         radius = gap / 2
         line = length - gap
         arc = pi * radius
         distance = 0
-        width_traveled = radius
+        width_travelled = radius
         # Start at half gap for the first line
-        while width_traveled < width - radius:
+        while width_travelled < width - radius:
             distance += line + arc
-            width_traveled += gap
+            width_travelled += gap
 
         return distance
 
-    def travel_plan(self) -> list:
-        return super().travel_plan()
-
     @classmethod
-    def _nb_param_(cls):
+    def _nb_param_(cls) -> int:
+        """Get number of param needed for the init
+
+        Returns
+        -------
+        int
+            Number of param
+        """
         return len(signature(cls.__init__).parameters)
 
+
+# Recon maneuver, sweep / scan zone.
 
 class Spiral(Maneuver):
 
     def __init__(self, speed: float, altitude: float, gap: float,
                  zone_length: float, plane: Plane):
+        """Spiral maneuver
 
+        Parameters
+        ----------
+        speed : float
+            Mean speed for the maneuver (km/h)
+        altitude : float
+            Mean altitude for the maneuver (feet)
+        gap : float
+            Gap between each pass through (km)
+        zone_length : float
+            Length and width of the zone to scan (km)
+        plane : Plane
+            Type of plane
+        """
         # Zone is literaly a zone for the spiral, and has to be a square
+        self.gap = gap
         self.length = zone_length
         # Let's not do a spiral in a rectangle
-        distance = self.calculate_distance(self.length, gap)
+        distance = self.calculate_distance(self.length, self.gap)
         super().__init__(Maneuver_Mission.Spiral, speed,
                          altitude, distance, plane)
 
-    def travel_plan(self) -> list:
-        return super().travel_plan()
+    def calculate_distance(self, length: float, gap: float) -> float:
+        """Calculate the total length / travelled distance of the spiral
 
-    # Calculate the total length of Spiral
-    def calculate_distance(self, length: float, gap: float):
+        Parameters
+        ----------
+        length : float
+            Length and width of the zone to scan
+        gap : float
+            Gap between each pass through (km)
+
+        Returns
+        -------
+        float
+            Total length of the spiral
+        """
         # Source : https://planetcalc.com/9063 (https://fr.planetcalc.com/9063)
         # https://www.intmath.com/blog/mathematics/length-of-an-archimedean-spiral-6595
         r = length - gap
@@ -72,106 +147,215 @@ class Spiral(Maneuver):
 
     @classmethod
     def _nb_param_(cls):
+        """Get number of param needed for the init
+
+        Returns
+        -------
+        int
+            Number of param
+        """
         return len(signature(cls.__init__).parameters)
 
+
+# Intimidation maneuver.
 
 class ShowOfForce(Maneuver):
     # maxspeed: int, minspeed: int,
     def __init__(self, meanspeed: int, plane: Plane):
+        """Create show of force maneuver, intimidation
+
+        Parameters
+        ----------
+        meanspeed : int
+            Mean speed used to make distance (km/h)
+        plane : Plane
+            Type of plane
+        """
         # Normally, there are constant values for everything in the show of
         # force. We can leave parameters but throw fixed value in super.
 
         super().__init__(Maneuver_Mission.ShowOfForce, meanspeed,
                          2000, 24.7, plane)
 
+    def total_fuel_consumption(self) -> float:
+        """Calculate the total fuel consumption for this maneuver
+        according to the travel plan.
+
+        Returns
+        -------
+        float
+            Total fuel consumption (liters)
+        """
+        return sum(p.total_fuel_consumption() for p in self.travel_plan())
+
+    def travelled_time(self) -> float:
+        """Calculate the total travelled time for this maneuver
+        according to the travel plan.
+
+        Returns
+        -------
+        float
+            Total travelled time (seconds)
+        """
+        return sum(p.travelled_time() for p in self.travel_plan())
+
     def travel_plan(self) -> list:
+        """Break down of the steps of this maneuver. See Miro for information
+
+        Returns
+        -------
+        list
+            List of SimpleMove (Maneuver), with unique speed, altitude and
+            travelled distance. Used for the total travel time and
+            total fuel consumption.
+        """
+
         # Add few steps in the show of force : first is a line at meanspeed
-        # and high altitude. Second is min speed and reducing altitude
-        # Lastly, at a minimum altitude the plane go straight above the
-        # objective at max speed.
+        # and high altitude.
 
         t_plan = []
-
-        first = dict()
-        first['Speed'] = self.meanspeed
-        first['Distance'] = STRAIGHT_LINE_SF
-        first['Altitude'] = self.altitude
-        first['Time'] = first['Distance'] / (first['Speed'] / 3600)
+        first = Maneuver(Maneuver_Mission.SimpleMove, self.meanspeed,
+                         self.altitude, STRAIGHT_LINE_SF, self.plane)
         t_plan.append(first)
 
-        second = dict()
-        second['Speed'] = self.minspeed
-        second['Distance'] = 4.7
-        second['Altitude'] = ((self.altitude * (3/2)) if (self.altitude * 3/2)
-                              < self.maxaltitude else self.maxaltitude)
-        second['Time'] = second['Distance'] / (second['Speed'] / 3600)
+        # Second is min speed and reducing altitude
+        second_alt = ((self.altitude * (3/2)) if (self.altitude * 3/2)
+                      < self.maxaltitude else self.maxaltitude)
+        second = Maneuver(Maneuver_Mission.SimpleMove, self.minspeed,
+                          second_alt, 4.7, self.plane)
         t_plan.append(second)
 
-        third = dict()
-        third['Speed'] = self.maxspeed
-        third['Distance'] = STRAIGHT_LINE_SF
-        third['Altitude'] = ((self.altitude / 2) if (self.altitude / 2) >
-                             self.minaltitude else self.minaltitude)
-        third['Time'] = third['Distance'] / (third['Speed'] / 3600)
+        # Lastly, at a minimum altitude the plane go straight above the
+        # objective at max speed.
+        third = Maneuver(Maneuver_Mission.SimpleMove, self.maxspeed,
+                         self.minaltitude, STRAIGHT_LINE_SF, self.plane)
         t_plan.append(third)
 
         return t_plan
 
     @classmethod
     def _nb_param_(cls):
+        """Get number of param needed for the init
+
+        Returns
+        -------
+        int
+            Number of param
+        """
         return len(signature(cls.__init__).parameters)
 
 
-# Particular maneuver : circle above the objective
+# Circle above the objective : intimidation or attack maneuver
 
 class Wheel(Maneuver):
     # maxspeed: int, minspeed: int,
     def __init__(self, meanspeed: int, altitude: float,
                  radius: float, plane: Plane):
+        """Create Wheel maneuver, intimidation or attack.
+
+        Parameters
+        ----------
+        meanspeed : int
+            Mean speed used for the circle. (km/h)
+        altitude : float
+            Mean altitude used for the circle (feet)
+        radius : float
+            Radius of the circle (km)
+        plane : Plane
+            Type of plane
+        """
+
         self.radius = radius
         distance = self.calculate_circle(radius) + STRAIGHT_LINE_WHEEL
         super().__init__(Maneuver_Mission.Wheel, meanspeed,
                          altitude, distance, plane)
 
+    def total_fuel_consumption(self) -> float:
+        """Calculate the total fuel consumption for this maneuver
+        according to the travel plan.
+
+        Returns
+        -------
+        float
+            Total fuel consumption (liters)
+        """
+        return sum(p.total_fuel_consumption for p in self.travel_plan())
+
+    def travelled_time(self) -> float:
+        """Calculate the total travelled time for this maneuver
+        according to the travel plan.
+
+        Returns
+        -------
+        float
+            Total travelled time (seconds)
+        """
+        return sum(p.travelled_time() for p in self.travel_plan())
+
     def travel_plan(self) -> list:
-        # Add few steps in the wheel : first is a circle at meanspeed
-        # and fixed altitude. Second is min speed to quit the circle.
-        # Lastly, the plane go straight above the objective at max speed.
+        """Break down of the steps of this maneuver. See Miro for information
 
+        Returns
+        -------
+        list
+            List of SimpleMove (Maneuver), with unique speed, altitude and
+            travelled distance. Used for the total travel time and
+            total fuel consumption.
+        """
+
+        # TODO : change for maneuvers
         t_plan = []
-
-        first = dict()
-        first['Speed'] = self.meanspeed
-        first['Distance'] = self.calculate_circle(self.radius)
-        first['Altitude'] = self.altitude
-        first['Time'] = first['Distance'] / (first['Speed'] / 3600)
+        # Add few steps in the wheel : first is a circle at meanspeed
+        # and fixed altitude.
+        first = Maneuver(Maneuver_Mission.SimpleMove, self.meanspeed,
+                         self.altitude, self.calculate_circle(self.radius),
+                         self.plane)
         t_plan.append(first)
 
-        second = dict()
-        second['Speed'] = self.minspeed
-        second['Distance'] = STRAIGHT_LINE_WHEEL / 4
-        second['Altitude'] = ((self.altitude / 2) if (self.altitude / 2) >
-                              self.minaltitude else self.minaltitude)
-        second['Time'] = second['Distance'] / (second['Speed'] / 3600)
+        # Second is min speed to quit the circle.
+        second_alt = ((self.altitude / 2) if (self.altitude / 2) >
+                      self.minaltitude else self.minaltitude)
+        second = Maneuver(Maneuver_Mission.SimpleMove, self.minspeed,
+                          second_alt, STRAIGHT_LINE_WHEEL / 4, self.plane)
         t_plan.append(second)
 
-        third = dict()
-        third['Speed'] = self.maxspeed
-        third['Distance'] = STRAIGHT_LINE_WHEEL * 3 / 4
-        third['Altitude'] = ((self.altitude / 2) if (self.altitude / 2) >
-                             self.minaltitude else self.minaltitude)
-        third['Time'] = third['Distance'] / (third['Speed'] / 3600)
+        # Lastly, the plane go straight above the objective at max speed.
+        third_alt = ((self.altitude / 2) if (self.altitude / 2) >
+                     self.minaltitude else self.minaltitude)
+        third = Maneuver(Maneuver_Mission.SimpleMove, self.maxspeed,
+                         third_alt, STRAIGHT_LINE_WHEEL * 3 / 4, self.plane)
         t_plan.append(third)
 
         return t_plan
 
     # Calculate circle length
-    def calculate_circle(self, radius: float, ):
+    def calculate_circle(self, radius: float, ) -> float:
+        """Calculate the size of the circle
+
+        Parameters
+        ----------
+        radius : float
+            Radius of the circle
+        Returns
+        -------
+        float
+            Total size
+        """
         return (2 * pi * radius)
 
     @classmethod
     def _nb_param_(cls):
+        """Get number of param needed for the init
+
+        Returns
+        -------
+        int
+            Number of param
+        """
         return len(signature(cls.__init__).parameters)
 
+
+# List of all usable maneuver
+# WIP
 
 LIST_MAN = [Wheel, ShowOfForce, Spiral, ZigZag]
